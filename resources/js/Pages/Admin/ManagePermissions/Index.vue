@@ -1,8 +1,8 @@
 <script setup lang="ts">
 // v5 – OpenBrain theme colors + circular checkboxes
-import { ref, computed } from 'vue'
-import { Head, router } from '@inertiajs/vue3'
-import AppLayout from '@/Layouts/AppLayout.vue'
+import AppLayout from '@/Layouts/AppLayout.vue';
+import { Head, router } from '@inertiajs/vue3';
+import { computed, ref } from 'vue';
 
 interface RoleItem { id: number; name: string; display_name: string | null; users_count: number }
 interface UserItem  { id: string; name: string; email: string; roles: string }
@@ -225,7 +225,7 @@ function save() {
             <span class="card-hd-icon">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
             </span>
-            <span>Permissions</span>
+            <span :style="{ paddingLeft: '7px' }">Permissions</span>
             <span class="perm-hint">Check or uncheck to allow / deny access</span>
           </div>
 
@@ -413,10 +413,11 @@ function save() {
   text-transform: uppercase; color: rgba(250,246,239,.55);
 }
 .card-hd-icon {
-  width: 22px; height: 22px; border-radius: 5px;
+  /* width: 22px; height: 22px; */
+  border-radius: 5px;
   background: rgba(201,137,60,.18); border: 1px solid rgba(201,137,60,.3);
   display: flex; align-items: center; justify-content: center;
-  color: #c9893c; flex-shrink: 0;
+  color: #c9893c; flex-shrink: 0; padding: 8px;
 }
 .perm-hd { gap: 0; flex-wrap: wrap; padding: 10px 14px; row-gap: 3px; }
 .perm-hd > span { display: block; }

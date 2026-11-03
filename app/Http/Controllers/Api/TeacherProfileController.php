@@ -14,6 +14,7 @@ use App\Models\Core\TeacherTeachingStyle;
 use App\Models\Core\TeacherVerification;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 
@@ -96,23 +97,34 @@ class TeacherProfileController extends Controller
 
     public function storeEducation(Request $request): JsonResponse
     {
-        $data = $request->validate([
+        $validator = Validator::make($request->all(), [
             'type'        => ['required', 'string', Rule::in(['degree', 'certificate'])],
             'title'       => ['required', 'string', 'max:200'],
             'institution' => ['nullable', 'string', 'max:200'],
             'start_year'  => ['nullable', 'integer', 'min:1950', 'max:2100'],
             'end_year'    => ['nullable', 'integer', 'min:1950', 'max:2100'],
-            'is_current'  => ['boolean'],
+            'cgpa'        => ['nullable', 'string', 'max:20'],
+            'is_current'  => ['boolean']
         ]);
 
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => $validator->errors()->first()
+            ], 422);
+        }
+
         $userId             = $request->user()->id;
+        $data               = $request->all();
         $data['user_id']    = $userId;
         $data['is_current'] = $data['is_current'] ?? false;
         $data['sort_order'] = TeacherEducation::where('user_id', $userId)->max('sort_order') + 1;
 
         $education = TeacherEducation::create($data);
 
-        return response()->json(['message' => 'Education entry added.', 'education' => $education], 201);
+        $educations = TeacherEducation::where('user_id', $userId)->orderBy('id', 'desc')->get();
+
+        return response()->json(['message' => 'Education entry added.', 'education' => $education, 'educations' => $educations], 201);
     }
 
     // ── PUT /teacher/profile/education/{id} ───────────────────────────────────
@@ -123,18 +135,29 @@ class TeacherProfileController extends Controller
             ->where('user_id', $request->user()->id)
             ->firstOrFail();
 
-        $data = $request->validate([
+        $validator = Validator::make($request->all(), [
             'type'        => ['required', 'string', Rule::in(['degree', 'certificate'])],
             'title'       => ['required', 'string', 'max:200'],
             'institution' => ['nullable', 'string', 'max:200'],
             'start_year'  => ['nullable', 'integer', 'min:1950', 'max:2100'],
             'end_year'    => ['nullable', 'integer', 'min:1950', 'max:2100'],
+            'cgpa'        => ['nullable', 'string', 'max:20'],
             'is_current'  => ['boolean'],
         ]);
 
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => $validator->errors()->first()
+            ], 422);
+        }
+
+        $data = $request->all();
         $education->update($data);
 
-        return response()->json(['message' => 'Education entry updated.', 'education' => $education]);
+        $educations = TeacherEducation::where('user_id', $request->user()->id)->orderBy('id', 'desc')->get();
+
+        return response()->json(['message' => 'Education entry updated.', 'education' => $education, 'educations' => $educations]);
     }
 
     // ── DELETE /teacher/profile/education/{id} ────────────────────────────────
@@ -155,7 +178,7 @@ class TeacherProfileController extends Controller
     {
         $data = $request->validate([
             'role_type'        => ['required', 'string', Rule::in(['teacher', 'tutor', 'expert', 'freelance', 'student', 'other'])],
-            'start_month'      => ['nullable', 'integer', 'min:1', 'max:12'],
+            'start_month'      => ['nullable', 'string'],
             'start_year'       => ['nullable', 'integer', 'min:1950', 'max:2100'],
             'description'      => ['required', 'string', 'max:5000'],
             'expertise_tags'   => ['nullable', 'array'],
@@ -180,39 +203,61 @@ class TeacherProfileController extends Controller
     {
         $data = $request->validate([
             'subject_ids'       => ['nullable', 'array'],
-            'subject_ids.*'     => ['integer', 'exists:core.subjects,id'],
+            'subject_ids.*'     => ['integer', Rule::exists(Subject::class, 'id')],
             'grade_level_ids'   => ['nullable', 'array'],
-            'grade_level_ids.*' => ['integer', 'exists:core.grade_level,id'],
+            'grade_level_ids.*' => ['integer', Rule::exists(GradeLevel::class, 'id')],
             'session_types'     => ['nullable', 'array'],
             'session_types.*'   => ['string', Rule::in(['one-on-one', 'group'])],
         ]);
 
         $teacherProfile = TeacherProfile::firstOrCreate(['user_id' => $request->user()->id]);
 
-        $teacherProfile->subjects()->sync($data['subject_ids'] ?? []);
-        $teacherProfile->gradeLevels()->sync($data['grade_level_ids'] ?? []);
-        $teacherProfile->update(['session_types' => $data['session_types'] ?? []]);
+        // Support partial updates — only sync/update fields that were actually sent
+        if ($request->has('subject_ids'))     $teacherProfile->subjects()->sync($data['subject_ids'] ?? []);
+        if ($request->has('grade_level_ids')) $teacherProfile->gradeLevels()->sync($data['grade_level_ids'] ?? []);
+        if ($request->has('session_types'))   $teacherProfile->update(['session_types' => $data['session_types'] ?? []]);
 
-        return response()->json(['message' => 'Subjects updated.']);
+        $teacherProfile->refresh()->load(['subjects', 'gradeLevels']);
+
+        return response()->json([
+            'success'      => true,
+            'message'      => 'Subjects updated.',
+            'subjects'     => $teacherProfile->subjects,
+            'grade_levels' => $teacherProfile->gradeLevels,
+            'session_types' => $teacherProfile->session_types ?? [],
+        ]);
     }
 
     // ── POST /teacher/profile/teaching-styles ────────────────────────────────
 
     public function storeTeachingStyle(Request $request): JsonResponse
     {
-        $data = $request->validate([
+        $validator = Validator::make($request->all(), [
             'name'        => ['required', 'string', 'max:100'],
             'description' => ['nullable', 'string', 'max:500'],
             'color'       => ['nullable', 'string', 'max:20'],
         ]);
 
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => $validator->errors()->first()
+            ], 422);
+        }
+
         $userId             = $request->user()->id;
+        $data               = $request->all();
         $data['user_id']    = $userId;
+        $data['color']      = $data['color'] ? $data['color'] : '#3498db';
         $data['sort_order'] = TeacherTeachingStyle::where('user_id', $userId)->max('sort_order') + 1;
 
         $style = TeacherTeachingStyle::create($data);
 
-        return response()->json(['message' => 'Teaching style added.', 'style' => $style], 201);
+        return response()->json([
+            'success' => true, 
+            'message' => 'Teaching style added.', 
+            'style' => $style
+        ], 201);
     }
 
     // ── PUT /teacher/profile/teaching-styles/{id} ────────────────────────────
@@ -250,40 +295,86 @@ class TeacherProfileController extends Controller
 
     public function updateAvailability(Request $request): JsonResponse
     {
-        $data = $request->validate([
-            'is_flexible_time' => ['required', 'boolean'],
-            'slots'            => ['nullable', 'array'],
-            'slots.*.day'      => ['required', 'integer', 'min:0', 'max:6'],
-            'slots.*.time'     => ['required', 'date_format:H:i'],
+        $validator = Validator::make($request->all(), [
+            'is_flexible_time'        => ['nullable', 'boolean'],
+            'availability'            => ['nullable', 'array'],
+            'availability.*.day'      => ['required_with:availability', 'string'], 
+            'availability.*.slots'    => ['required_with:availability', 'array'],
+            //'availability.*.slots.*'  => ['date_format:h:i A'],
         ]);
 
-        $userId = $request->user()->id;
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => $validator->errors()->first()
+            ], 422);
+        }
 
-        DB::transaction(function () use ($userId, $data) {
+        $userId = $request->user()->id;
+        $data = $request->all();
+
+        $dayMap = [
+            'Sat' => 0,
+            'Sun' => 1,
+            'Mon' => 2,
+            'Tue' => 3,
+            'Wed' => 4,
+            'Thu' => 5,
+            'Fri' => 6,
+        ];
+
+        DB::beginTransaction();
+
+        try {
             TeacherAvailability::where('user_id', $userId)->delete();
 
-            if (!empty($data['slots'])) {
-                $rows = array_map(fn ($slot) => [
-                    'user_id'     => $userId,
-                    'day_of_week' => $slot['day'],
-                    'time_slot'   => $slot['time'],
-                ], $data['slots']);
+            if (!empty($data['availability'])) {
+                foreach ($data['availability'] as $item) {
+                    $dayNumber = $dayMap[$item['day']] ?? null;
+                    
+                    if ($dayNumber === null) {
+                        return response()->json([
+                            'success' => false,
+                            'message' => 'Invalid day: ' . $item['day']
+                        ], 451);
+                    }
 
-                $unique = collect($rows)
-                    ->unique(fn ($r) => $r['day_of_week'] . '_' . $r['time_slot'])
-                    ->values()
-                    ->all();
+                    foreach ($item['slots'] as $time) {
+                        $time24 = \Carbon\Carbon::createFromFormat('h:i A', $time)->format('H:i');
 
-                TeacherAvailability::insert($unique);
+                        TeacherAvailability::create([
+                            'user_id'     => $userId,
+                            'day_of_week' => $dayNumber,
+                            'time_slot'   => $time24,
+                        ]);
+                    }
+                }
             }
 
-            TeacherProfile::updateOrCreate(
-                ['user_id' => $userId],
-                ['is_flexible_time' => $data['is_flexible_time']]
-            );
-        });
+            if ($request->has('is_flexible_time')) {
+                TeacherProfile::updateOrCreate(
+                    ['user_id' => $userId],
+                    ['is_flexible_time' => $data['is_flexible_time'] ?? false]
+                );
+            }
 
-        return response()->json(['message' => 'Availability updated.']);
+            DB::commit();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Availability updated.'
+            ], 200);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            
+            \Log::error('Update failed: ' . $e->getMessage());
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed: ' . $e->getMessage()
+            ], 500);
+        }
     }
 
     // ── POST /teacher/profile/verification ───────────────────────────────────

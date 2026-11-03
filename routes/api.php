@@ -38,8 +38,8 @@ Route::prefix('teacher')->middleware('auth:sanctum')->group(function () {
     Route::put('profile/about', [TeacherProfileController::class, 'updateAbout']);
 
     // Education & Certificate
-    Route::post('profile/education',        [TeacherProfileController::class, 'storeEducation']);
-    Route::put('profile/education/{id}',    [TeacherProfileController::class, 'updateEducation']);
+    Route::post('profile/education', [TeacherProfileController::class, 'storeEducation']);
+    Route::put('profile/education/{id}', [TeacherProfileController::class, 'updateEducation']);
     Route::delete('profile/education/{id}', [TeacherProfileController::class, 'destroyEducation']);
 
     // Teacher Experience

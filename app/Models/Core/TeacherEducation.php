@@ -9,7 +9,7 @@ class TeacherEducation extends Model
     protected $table = 'core.teacher_educations';
 
     protected $fillable = [
-        'user_id', 'type', 'title', 'institution',
+        'user_id', 'type', 'title', 'institution', 'cgpa',
         'start_year', 'end_year', 'is_current', 'sort_order',
     ];
 
