@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 class NavSubmenu extends Model
 {
     protected $fillable = [
-        'menu_id', 'name', 'search_key', 'to', 'sort_order', 'is_active',
+        'menu_id', 'name', 'icon_key', 'search_key', 'to', 'sort_order', 'is_active',
     ];
 
     protected $casts = [

@@ -7,6 +7,8 @@ export interface NavButton {
   submenu_id: number
   name: string
   key_value: string
+  icon_key: string | null
+  to: string | null
   sort_order: number
   is_active: boolean
 }
@@ -15,6 +17,7 @@ export interface NavSubmenu {
   id: number
   menu_id: number
   name: string
+  icon_key: string | null
   search_key: string | null
   to: string | null
   sort_order: number

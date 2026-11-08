@@ -31,6 +31,7 @@ interface NavSubmenu {
   id: number
   menu_id: number
   name: string
+  icon_key: string | null
   search_key: string | null
   to: string | null
   sort_order: number
@@ -42,6 +43,8 @@ interface NavButton {
   submenu_id: number
   name: string
   key_value: string
+  icon_key: string | null
+  to: string | null
   sort_order: number
   is_active: boolean
 }
@@ -169,6 +172,7 @@ const submenuForm = ref({
   id: null as number | null,
   menu_id: 0,
   name: '',
+  icon_key: '',
   search_key: '',
   to: '',
   sort_order: 0,
@@ -180,6 +184,8 @@ const buttonForm = ref({
   submenu_id: 0,
   name: '',
   key_value: '',
+  icon_key: '',
+  to: '',
   sort_order: 0,
   is_active: true,
 })
@@ -308,13 +314,13 @@ async function onMenuDragEnd() {
 function openAddSubmenu() {
   if (!selectedMenu.value) return
   submenuModalMode.value = 'create'
-  submenuForm.value = { id: null, menu_id: selectedMenu.value.id, name: '', search_key: '', to: '', sort_order: submenus.value.length, is_active: true }
+  submenuForm.value = { id: null, menu_id: selectedMenu.value.id, name: '', icon_key: '', search_key: '', to: '', sort_order: submenus.value.length, is_active: true }
   showSubmenuModal.value = true
 }
 
 function openEditSubmenu(sub: NavSubmenu) {
   submenuModalMode.value = 'edit'
-  submenuForm.value = { id: sub.id, menu_id: sub.menu_id, name: sub.name, search_key: sub.search_key || '', to: sub.to || '', sort_order: sub.sort_order, is_active: sub.is_active }
+  submenuForm.value = { id: sub.id, menu_id: sub.menu_id, name: sub.name, icon_key: sub.icon_key || '', search_key: sub.search_key || '', to: sub.to || '', sort_order: sub.sort_order, is_active: sub.is_active }
   showSubmenuModal.value = true
 }
 
@@ -323,6 +329,7 @@ function submitSubmenu() {
     router.post('/submenus', {
       menu_id: submenuForm.value.menu_id,
       name: submenuForm.value.name,
+      icon_key: submenuForm.value.icon_key || null,
       search_key: submenuForm.value.search_key || null,
       to: submenuForm.value.to || null,
       sort_order: submenuForm.value.sort_order,
@@ -339,6 +346,7 @@ function submitSubmenu() {
   } else {
     router.put(`/submenus/${submenuForm.value.id}`, {
       name: submenuForm.value.name,
+      icon_key: submenuForm.value.icon_key || null,
       search_key: submenuForm.value.search_key || null,
       to: submenuForm.value.to || null,
       sort_order: submenuForm.value.sort_order,
@@ -388,6 +396,7 @@ async function onSubmenuDragEnd() {
 function toggleSubmenuActive(sub: NavSubmenu) {
   router.put(`/submenus/${sub.id}`, {
     name: sub.name,
+    icon_key: sub.icon_key,
     search_key: sub.search_key,
     to: sub.to,
     sort_order: sub.sort_order,
@@ -406,13 +415,13 @@ function toggleSubmenuActive(sub: NavSubmenu) {
 function openAddButton() {
   if (!selectedSubmenu.value) return
   buttonModalMode.value = 'create'
-  buttonForm.value = { id: null, submenu_id: selectedSubmenu.value.id, name: '', key_value: '', sort_order: buttons.value.length, is_active: true }
+  buttonForm.value = { id: null, submenu_id: selectedSubmenu.value.id, name: '', key_value: '', icon_key: '', to: '', sort_order: buttons.value.length, is_active: true }
   showButtonModal.value = true
 }
 
 function openEditButton(btn: NavButton) {
   buttonModalMode.value = 'edit'
-  buttonForm.value = { id: btn.id, submenu_id: btn.submenu_id, name: btn.name, key_value: btn.key_value, sort_order: btn.sort_order, is_active: btn.is_active }
+  buttonForm.value = { id: btn.id, submenu_id: btn.submenu_id, name: btn.name, key_value: btn.key_value, icon_key: btn.icon_key || '', to: btn.to || '', sort_order: btn.sort_order, is_active: btn.is_active }
   showButtonModal.value = true
 }
 
@@ -422,6 +431,8 @@ function submitButton() {
       submenu_id: buttonForm.value.submenu_id,
       name: buttonForm.value.name,
       key_value: buttonForm.value.key_value,
+      icon_key: buttonForm.value.icon_key || null,
+      to: buttonForm.value.to || null,
       sort_order: buttonForm.value.sort_order,
       is_active: buttonForm.value.is_active,
     }, {
@@ -437,6 +448,8 @@ function submitButton() {
     router.put(`/buttons/${buttonForm.value.id}`, {
       name: buttonForm.value.name,
       key_value: buttonForm.value.key_value,
+      icon_key: buttonForm.value.icon_key || null,
+      to: buttonForm.value.to || null,
       sort_order: buttonForm.value.sort_order,
       is_active: buttonForm.value.is_active,
     }, {
@@ -485,6 +498,8 @@ function toggleButtonActive(btn: NavButton) {
   router.put(`/buttons/${btn.id}`, {
     name: btn.name,
     key_value: btn.key_value,
+    icon_key: btn.icon_key,
+    to: btn.to,
     sort_order: btn.sort_order,
     is_active: !btn.is_active,
   }, {
@@ -677,7 +692,10 @@ function refresh() {
                 <div style="display:flex;align-items:center;justify-content:space-between">
                   <div style="flex:1;min-width:0">
                     <div style="font-weight:600;font-size:.85rem;color:#1a1208">{{ sub.name }}</div>
-                    <div style="font-size:.7rem;color:#888;margin-top:2px">To: {{ sub.to || '—' }} &bull; Order: {{ sub.sort_order }}</div>
+                    <div style="font-size:.7rem;color:#888;margin-top:2px">
+                      To: {{ sub.to || '—' }} &bull; Order: {{ sub.sort_order }}
+                      <template v-if="sub.icon_key"> &bull; Icon: {{ sub.icon_key }}</template>
+                    </div>
                   </div>
                   <div style="display:flex;gap:4px;margin-left:8px;flex-shrink:0" @click.stop>
                     <button style="padding:3px 7px;background:none;border:1px solid #e2d5c3;border-radius:5px;font-size:.75rem;cursor:grab;color:#999;line-height:1" title="Drag to reorder">&#8597;</button>
@@ -726,6 +744,11 @@ function refresh() {
                   <div>
                     <div style="font-weight:600;font-size:.85rem;color:#1a1208">{{ btn.name }}</div>
                     <div style="font-size:.7rem;color:#888;margin-top:2px">Order: {{ btn.sort_order }} &bull; {{ btn.key_value }}</div>
+                    <div v-if="btn.to || btn.icon_key" style="font-size:.7rem;color:#666;margin-top:1px">
+                      <span v-if="btn.to">To: {{ btn.to }}</span>
+                      <span v-if="btn.to && btn.icon_key"> &bull; </span>
+                      <span v-if="btn.icon_key">Icon: {{ btn.icon_key }}</span>
+                    </div>
                   </div>
                   <div style="display:flex;gap:4px;flex-shrink:0" @click.stop>
                     <button style="padding:3px 7px;background:none;border:1px solid #e2d5c3;border-radius:5px;font-size:.75rem;cursor:grab;color:#999;line-height:1" title="Drag to reorder">&#8597;</button>
@@ -841,14 +864,20 @@ function refresh() {
           <label style="font-size:.78rem;font-weight:600;color:#333;display:block;margin-bottom:4px">Sub Menu/Sub Label</label>
           <input v-model="submenuForm.name" placeholder="e.g. Pending Approval" style="width:100%;padding:8px 10px;border:1px solid #e2d5c3;border-radius:7px;font-size:.8rem;outline:none;box-sizing:border-box" />
         </div>
-        <div style="margin-bottom:14px">
-          <label style="font-size:.78rem;font-weight:600;color:#333;display:block;margin-bottom:4px">Search Key (optional)</label>
-          <input v-model="submenuForm.search_key" placeholder="e.g. Manage Business" style="width:100%;padding:8px 10px;border:1px solid #e2d5c3;border-radius:7px;font-size:.8rem;outline:none;box-sizing:border-box" />
-        </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
+          <div>
+            <label style="font-size:.78rem;font-weight:600;color:#333;display:block;margin-bottom:4px">Icon Key</label>
+            <input v-model="submenuForm.icon_key" placeholder="e.g. school" style="width:100%;padding:8px 10px;border:1px solid #e2d5c3;border-radius:7px;font-size:.8rem;outline:none;box-sizing:border-box" />
+          </div>
           <div>
             <label style="font-size:.78rem;font-weight:600;color:#333;display:block;margin-bottom:4px">To (route)</label>
             <input v-model="submenuForm.to" placeholder="e.g. /admin/premium/reranking" style="width:100%;padding:8px 10px;border:1px solid #e2d5c3;border-radius:7px;font-size:.8rem;outline:none;box-sizing:border-box" />
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
+          <div>
+            <label style="font-size:.78rem;font-weight:600;color:#333;display:block;margin-bottom:4px">Search Key (optional)</label>
+            <input v-model="submenuForm.search_key" placeholder="e.g. Manage Business" style="width:100%;padding:8px 10px;border:1px solid #e2d5c3;border-radius:7px;font-size:.8rem;outline:none;box-sizing:border-box" />
           </div>
           <div>
             <label style="font-size:.78rem;font-weight:600;color:#333;display:block;margin-bottom:4px">Sort Order</label>
@@ -892,6 +921,16 @@ function refresh() {
           <label style="font-size:.78rem;font-weight:600;color:#333;display:block;margin-bottom:4px">Key Value <span style="color:red">*</span></label>
           <input v-model="buttonForm.key_value" placeholder="e.g. dashboard.edit" style="width:100%;padding:8px 10px;border:1px solid #e2d5c3;border-radius:7px;font-size:.8rem;outline:none;box-sizing:border-box" />
           <div style="font-size:.7rem;color:#888;margin-top:3px">Must be unique inside the selected submenu.</div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
+          <div>
+            <label style="font-size:.78rem;font-weight:600;color:#333;display:block;margin-bottom:4px">Icon Key</label>
+            <input v-model="buttonForm.icon_key" placeholder="e.g. edit" style="width:100%;padding:8px 10px;border:1px solid #e2d5c3;border-radius:7px;font-size:.8rem;outline:none;box-sizing:border-box" />
+          </div>
+          <div>
+            <label style="font-size:.78rem;font-weight:600;color:#333;display:block;margin-bottom:4px">To (route optional)</label>
+            <input v-model="buttonForm.to" placeholder="e.g. /students/create" style="width:100%;padding:8px 10px;border:1px solid #e2d5c3;border-radius:7px;font-size:.8rem;outline:none;box-sizing:border-box" />
+          </div>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px">
           <div>

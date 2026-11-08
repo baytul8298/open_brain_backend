@@ -134,6 +134,7 @@ class MenuController extends Controller
         $validated = $request->validate([
             'menu_id' => 'required|integer|exists:nav_menus,id',
             'name' => 'required|string|max:255',
+            'icon_key' => 'nullable|string|max:255',
             'search_key' => 'nullable|string|max:255',
             'to' => 'nullable|string|max:255',
             'sort_order' => 'integer|min:0',
@@ -148,6 +149,7 @@ class MenuController extends Controller
         $submenu = NavSubmenu::findOrFail($id);
         $validated = $request->validate([
             'name' => 'required|string|max:255',
+            'icon_key' => 'nullable|string|max:255',
             'search_key' => 'nullable|string|max:255',
             'to' => 'nullable|string|max:255',
             'sort_order' => 'integer|min:0',
@@ -188,6 +190,8 @@ class MenuController extends Controller
             'submenu_id' => 'required|integer|exists:nav_submenus,id',
             'name' => 'required|string|max:255',
             'key_value' => 'required|string|max:255',
+            'icon_key' => 'nullable|string|max:255',
+            'to' => 'nullable|string|max:255',
             'sort_order' => 'integer|min:0',
             'is_active' => 'boolean',
         ]);
@@ -208,6 +212,8 @@ class MenuController extends Controller
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'key_value' => 'required|string|max:255',
+            'icon_key' => 'nullable|string|max:255',
+            'to' => 'nullable|string|max:255',
             'sort_order' => 'integer|min:0',
             'is_active' => 'boolean',
         ]);

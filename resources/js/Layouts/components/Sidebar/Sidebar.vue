@@ -121,7 +121,8 @@ function isParentActive(parent: NavParentMenu) {
                 :href="sub.to || '#'"
                 :class="['ni', 'ni-sub', sub.to && isActive(sub.to) ? 'on' : '']"
               >
-                <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/></svg>
+                <i v-if="sub.icon_key" :class="sub.icon_key" class="ni-icon"></i>
+                <svg v-else viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/></svg>
                 {{ sub.name }}
               </Link>
             </template>

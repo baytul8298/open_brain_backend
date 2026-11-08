@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 class NavButton extends Model
 {
     protected $fillable = [
-        'submenu_id', 'name', 'key_value', 'sort_order', 'is_active',
+        'submenu_id', 'name', 'key_value', 'icon_key', 'to', 'sort_order', 'is_active',
     ];
 
     protected $casts = [
