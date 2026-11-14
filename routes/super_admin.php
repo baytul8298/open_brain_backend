@@ -3,8 +3,7 @@
 use App\Http\Controllers\Admin\ManagePermissionsController;
 use App\Http\Controllers\Admin\RoleController;
 use App\Http\Controllers\Admin\SubjectController;
-use App\Http\Controllers\Admin\UserController; 
-use App\Http\Controllers\Admin\ClassNameController;
+use App\Http\Controllers\Admin\UserController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware(['auth', 'verified', 'role:super-admin'])->group(function () {
@@ -48,15 +47,6 @@ Route::middleware(['auth', 'verified', 'role:super-admin'])->group(function () {
         Route::put('/{id}', [UserController::class, 'update'])->name('update');
         Route::delete('/{id}', [UserController::class, 'destroy'])->name('destroy');
         Route::get('/all', [UserController::class, 'all'])->name('all');
-    });
-
-    // Roles Routes
-    Route::prefix('class-name')->name('roles.')->group(function () {
-        Route::get('/', [ClassNameController::class, 'index'])->name('index');
-        Route::post('/', [ClassNameController::class, 'store'])->name('store');
-        Route::put('/{id}', [ClassNameController::class, 'update'])->name('update');
-        Route::delete('/{id}', [ClassNameController::class, 'destroy'])->name('destroy');
-        Route::get('/all', [ClassNameController::class, 'all'])->name('all');
     });
 
     // Manage Permissions
