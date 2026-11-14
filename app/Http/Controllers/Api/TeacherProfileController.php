@@ -102,6 +102,7 @@ class TeacherProfileController extends Controller
             'institution' => ['nullable', 'string', 'max:200'],
             'start_year'  => ['nullable', 'integer', 'min:1950', 'max:2100'],
             'end_year'    => ['nullable', 'integer', 'min:1950', 'max:2100'],
+            'cgpa'        => ['nullable', 'string', 'max:255'],
             'is_current'  => ['boolean'],
         ]);
 
@@ -129,6 +130,7 @@ class TeacherProfileController extends Controller
             'institution' => ['nullable', 'string', 'max:200'],
             'start_year'  => ['nullable', 'integer', 'min:1950', 'max:2100'],
             'end_year'    => ['nullable', 'integer', 'min:1950', 'max:2100'],
+            'cgpa'        => ['nullable', 'string', 'max:255'],
             'is_current'  => ['boolean'],
         ]);
 
@@ -189,9 +191,15 @@ class TeacherProfileController extends Controller
 
         $teacherProfile = TeacherProfile::firstOrCreate(['user_id' => $request->user()->id]);
 
-        $teacherProfile->subjects()->sync($data['subject_ids'] ?? []);
-        $teacherProfile->gradeLevels()->sync($data['grade_level_ids'] ?? []);
-        $teacherProfile->update(['session_types' => $data['session_types'] ?? []]);
+        if (array_key_exists('subject_ids', $data)) {
+            $teacherProfile->subjects()->sync($data['subject_ids'] ?? []);
+        }
+        if (array_key_exists('grade_level_ids', $data)) {
+            $teacherProfile->gradeLevels()->sync($data['grade_level_ids'] ?? []);
+        }
+        if (array_key_exists('session_types', $data)) {
+            $teacherProfile->update(['session_types' => $data['session_types'] ?? []]);
+        }
 
         return response()->json(['message' => 'Subjects updated.']);
     }
@@ -291,16 +299,19 @@ class TeacherProfileController extends Controller
     public function storeVerification(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'doc_type' => ['required', 'string', Rule::in(['ssc', 'hsc', 'honors', 'masters'])],
-            'document' => ['required', 'file', 'mimes:jpg,jpeg,png,pdf', 'max:5120'],
+            'doc_type' => ['nullable', 'string', Rule::in(['ssc', 'hsc', 'honors', 'masters', 'nid', 'phone'])],
+            'document' => ['nullable', 'file', 'mimes:jpg,jpeg,png,pdf', 'max:5120'],
+            'phone'    => ['nullable', 'string', 'max:30'],
         ]);
 
         $userId = $request->user()->id;
-        $path   = $request->file('document')->store("teacher-verifications/{$userId}", 'private');
+        $path   = $request->hasFile('document')
+            ? $request->file('document')->store("teacher-verifications/{$userId}", 'private')
+            : ($data['phone'] ?? 'phone-verification');
 
         $verification = TeacherVerification::create([
             'user_id'  => $userId,
-            'doc_type' => $data['doc_type'],
+            'doc_type' => $data['doc_type'] ?? ($request->hasFile('document') ? 'nid' : 'phone'),
             'doc_url'  => $path,
             'status'   => 'pending',
         ]);

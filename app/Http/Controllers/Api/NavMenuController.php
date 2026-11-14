@@ -21,7 +21,8 @@ class NavMenuController extends Controller
         }
 
         $role     = $user->roles->first();
-        $roleType = $role?->role_type;
+        $userRole = $user->role instanceof \BackedEnum ? $user->role->value : $user->role;
+        $roleType = $role?->role_type ?? ($userRole === 'super_admin' ? 'admin' : $userRole);
         $roleId   = $role?->id;
 
         $effectiveMenuIds    = null;

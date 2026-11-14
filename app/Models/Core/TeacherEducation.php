@@ -10,7 +10,7 @@ class TeacherEducation extends Model
 
     protected $fillable = [
         'user_id', 'type', 'title', 'institution',
-        'start_year', 'end_year', 'is_current', 'sort_order',
+        'start_year', 'end_year', 'cgpa', 'is_current', 'sort_order',
     ];
 
     protected $casts = [

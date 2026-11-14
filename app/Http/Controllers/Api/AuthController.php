@@ -63,7 +63,7 @@ class AuthController extends Controller
                 'password_hash'  => Hash::make($request->password),
                 'role'           => 'student',
                 'status'         => 'pending_verification',
-                'username'       => mb_strtolower($request->last_name),
+                'username'       => mb_strtolower(preg_replace('/\s+/', '_', trim($request->last_name ?: $request->first_name))) . '_' . Str::lower(Str::random(5)),
                 'user_type'      => 'student',
                 'language'       => 'en',
                 'email_verified' => false,
@@ -120,7 +120,7 @@ class AuthController extends Controller
                 'password_hash'  => Hash::make($request->password),
                 'role'           => 'teacher',
                 'status'         => 'pending_verification',
-                'username'       => mb_strtolower($lastName ?: $firstName),
+                'username'       => mb_strtolower(preg_replace('/\s+/', '_', trim($lastName ?: $firstName))) . '_' . Str::lower(Str::random(5)),
                 'user_type'      => 'teacher',
                 'language'       => 'en',
                 'email_verified' => false,
@@ -265,14 +265,21 @@ class AuthController extends Controller
 
     private function userPayload(User $user): array
     {
+        $user->loadMissing('profile');
+
         return [
             'id'             => $user->id,
             'email'          => $user->email,
             'phone'          => $user->phone,
-            'role'           => $user->role,
-            'status'         => $user->status,
+            'role'           => $user->role instanceof \BackedEnum ? $user->role->value : $user->role,
+            'status'         => $user->status instanceof \BackedEnum ? $user->status->value : $user->status,
             'phone_verified' => (bool) $user->phone_verified,
             'email_verified' => (bool) $user->email_verified,
+            'profile'        => $user->profile ? [
+                'first_name' => $user->profile->first_name,
+                'last_name'  => $user->profile->last_name,
+                'avatar_url' => $user->profile->avatar_url,
+            ] : null,
         ];
     }
 }
