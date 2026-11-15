@@ -23,13 +23,33 @@ const displayName = computed(() => user.value?.name ?? 'Teacher')
 
 const navParentMenus = computed<NavParentMenu[]>(() => page.props.nav_parent_menus || [])
 
+function hasRoute(to: string | null | undefined): boolean {
+  if (!to) return false
+  const trimmed = to.trim()
+  return trimmed !== '' && trimmed !== '#'
+}
+
+function getIconClass(iconKey: string | null | undefined): string {
+  if (!iconKey) return 'bi bi-circle'
+  const trimmed = iconKey.trim()
+  if (!trimmed) return 'bi bi-circle'
+  if (/\bfa(-|s\b|r\b|b\b|l\b|d\b|\b)/.test(trimmed)) {
+    return trimmed
+  }
+  const cleaned = trimmed.replace(/\bbi\b/g, '').trim()
+  if (!cleaned) return 'bi bi-circle'
+  return cleaned.startsWith('bi-') ? `bi ${cleaned}` : `bi bi-${cleaned}`
+}
+
 function resolveHref(to: string | null): string {
-  if (!to) return '#'
-  if (to.startsWith('http') || to.startsWith('/teacher/')) return to
-  return '/teacher/' + to.replace(/^\/+/, '')
+  if (!hasRoute(to)) return '#'
+  const trimmed = to!.trim()
+  if (trimmed.startsWith('http') || trimmed.startsWith('/')) return trimmed
+  return '/teacher/' + trimmed.replace(/^\/+/, '')
 }
 
 const isActive = (href: string | null) => {
+  if (!hasRoute(href)) return false
   const resolved = resolveHref(href)
   return resolved !== '#' && (
     window.location.pathname === resolved ||
@@ -94,28 +114,23 @@ function isMenuExpanded(menu: NavMenu) {
         <template v-for="parent in navParentMenus" :key="parent.id">
           <div class="tp-section">{{ parent.name }}</div>
           <template v-for="menu in parent.menus" :key="menu.id">
-            <!-- Direct link -->
+            <!-- Menu with a "to/route" value -> clicking takes action -->
             <Link
-              v-if="menu.to && (!menu.submenus || menu.submenus.length === 0)"
+              v-if="hasRoute(menu.to)"
               :href="resolveHref(menu.to)"
               :class="['tp-link', { active: isActive(menu.to) }]"
             >
-              <i v-if="menu.icon_key" :class="menu.icon_key" class="tp-icon"></i>
-              <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <circle cx="12" cy="12" r="10"/>
-              </svg>
+              <i :class="[getIconClass(menu.icon_key), 'tp-icon']"></i>
               <span>{{ menu.name }}</span>
             </Link>
-            <!-- Group menu with submenus -->
-            <template v-else>
+            <!-- Menu without a "to/route" value and with submenus -> clicking expands it -->
+            <template v-else-if="menu.submenus && menu.submenus.length > 0">
               <button
+                type="button"
                 @click="toggleMenu(menu)"
                 :class="['tp-link', { active: hasActiveSubmenu(menu) }]"
               >
-                <i v-if="menu.icon_key" :class="menu.icon_key" class="tp-icon"></i>
-                <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <circle cx="12" cy="12" r="10"/>
-                </svg>
+                <i :class="[getIconClass(menu.icon_key), 'tp-icon']"></i>
                 <span>{{ menu.name }}</span>
                 <span class="tp-chevron">{{ isMenuExpanded(menu) ? '▲' : '▼' }}</span>
               </button>
@@ -126,7 +141,8 @@ function isMenuExpanded(menu: NavMenu) {
                   :href="resolveHref(sub.to)"
                   :class="['tp-link', 'tp-link-sub', { active: sub.to && isActive(sub.to) }]"
                 >
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/></svg>
+                  <i v-if="sub.icon_key && sub.icon_key.trim()" :class="[getIconClass(sub.icon_key), 'tp-icon']"></i>
+                  <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/></svg>
                   <span>{{ sub.name }}</span>
                 </Link>
               </template>

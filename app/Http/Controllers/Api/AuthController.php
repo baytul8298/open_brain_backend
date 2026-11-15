@@ -31,6 +31,17 @@ class AuthController extends Controller
         }
 
         if (! $user->phone_verified) {
+            $hasActiveOtp = OtpVerification::where('user_id', $user->id)
+                ->where('type', 'registration')
+                ->where('is_used', false)
+                ->where('expires_at', '>', now())
+                ->exists();
+
+            if (! $hasActiveOtp) {
+                $otp = $this->generateAndStoreOtp($user, 'registration');
+                Log::info("OTP login verification code for {$user->phone}: {$otp}");
+            }
+
             return response()->json([
                 'message'      => 'Please verify your phone number before logging in.',
                 'requires_otp' => true,
@@ -265,14 +276,17 @@ class AuthController extends Controller
 
     private function userPayload(User $user): array
     {
+        $user->loadMissing('profile');
+
         return [
             'id'             => $user->id,
             'email'          => $user->email,
             'phone'          => $user->phone,
-            'role'           => $user->role,
-            'status'         => $user->status,
+            'role'           => $user->getRawOriginal('role') ?: ($user->role->value ?? $user->role),
+            'status'         => $user->getRawOriginal('status') ?: ($user->status->value ?? $user->status),
             'phone_verified' => (bool) $user->phone_verified,
             'email_verified' => (bool) $user->email_verified,
+            'profile'        => $user->profile,
         ];
     }
 }

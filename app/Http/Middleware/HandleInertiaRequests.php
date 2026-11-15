@@ -4,6 +4,7 @@ namespace App\Http\Middleware;
 
 use App\Models\NavParentMenu;
 use App\Models\NavMenu;
+use App\Models\NavSubmenu;
 use App\Models\RoleNavPermission;
 use App\Models\UserNavPermission;
 use Illuminate\Http\Request;
@@ -75,35 +76,61 @@ class HandleInertiaRequests extends Middleware
 
     private function computeNavAccess($user): array
     {
-        $role   = $user?->roles->first();
-        $roleId = $role?->id;
+        if (! $user) {
+            return [
+                'role_type'   => null,
+                'menu_ids'    => [],
+                'submenu_ids' => [],
+            ];
+        }
 
-        $effectiveMenuIds    = null;
-        $effectiveSubmenuIds = null;
+        $roles    = $user->roles;
+        $role     = $roles->first();
+        $roleType = $role?->role_type;
+        $roleIds  = $roles->pluck('id')->toArray();
 
-        if ($roleId) {
-            $rolePerms = RoleNavPermission::where('role_id', $roleId)->get();
+        if (! $roleType) {
+            $rawRole  = $user->getRawOriginal('role');
+            $roleType = match ($rawRole) {
+                'super_admin', 'admin' => 'admin',
+                'teacher'              => 'teacher',
+                'student'              => 'student',
+                default                => null,
+            };
+        }
 
-            if ($rolePerms->isNotEmpty()) {
-                $roleMenuIds    = $rolePerms->where('nav_item_type', 'menu')->pluck('nav_item_id')->toArray();
-                $roleSubmenuIds = $rolePerms->where('nav_item_type', 'submenu')->pluck('nav_item_id')->toArray();
+        $roleMenuIds    = [];
+        $roleSubmenuIds = [];
 
-                // Apply per-user overrides (grant/revoke on top of role)
-                $overrides    = UserNavPermission::where('user_id', $user->id)->get();
-                $addMenus     = $overrides->where('nav_item_type', 'menu')->where('is_granted', true)->pluck('nav_item_id')->toArray();
-                $rmMenus      = $overrides->where('nav_item_type', 'menu')->where('is_granted', false)->pluck('nav_item_id')->toArray();
-                $addSubmenus  = $overrides->where('nav_item_type', 'submenu')->where('is_granted', true)->pluck('nav_item_id')->toArray();
-                $rmSubmenus   = $overrides->where('nav_item_type', 'submenu')->where('is_granted', false)->pluck('nav_item_id')->toArray();
+        if (! empty($roleIds)) {
+            $rolePerms      = RoleNavPermission::whereIn('role_id', $roleIds)->get();
+            $roleMenuIds    = $rolePerms->where('nav_item_type', 'menu')->pluck('nav_item_id')->toArray();
+            $roleSubmenuIds = $rolePerms->where('nav_item_type', 'submenu')->pluck('nav_item_id')->toArray();
+        }
 
-                $effectiveMenuIds    = array_values(array_unique(array_merge(array_diff($roleMenuIds, $rmMenus), $addMenus)));
-                $effectiveSubmenuIds = array_values(array_unique(array_merge(array_diff($roleSubmenuIds, $rmSubmenus), $addSubmenus)));
-            }
+        // Apply per-user overrides (grant/revoke on top of role)
+        $overrides   = UserNavPermission::where('user_id', $user->id)->get();
+        $addMenus    = $overrides->where('nav_item_type', 'menu')->where('is_granted', true)->pluck('nav_item_id')->toArray();
+        $rmMenus     = $overrides->where('nav_item_type', 'menu')->where('is_granted', false)->pluck('nav_item_id')->toArray();
+        $addSubmenus = $overrides->where('nav_item_type', 'submenu')->where('is_granted', true)->pluck('nav_item_id')->toArray();
+        $rmSubmenus  = $overrides->where('nav_item_type', 'submenu')->where('is_granted', false)->pluck('nav_item_id')->toArray();
+
+        $effectiveMenuIds    = array_values(array_unique(array_merge(array_diff($roleMenuIds, $rmMenus), $addMenus)));
+        $effectiveSubmenuIds = array_values(array_unique(array_merge(array_diff($roleSubmenuIds, $rmSubmenus), $addSubmenus)));
+
+        if (! empty($effectiveSubmenuIds)) {
+            $parentMenuIdsFromSubs = NavSubmenu::whereIn('id', $effectiveSubmenuIds)
+                ->where('is_active', true)
+                ->pluck('menu_id')
+                ->toArray();
+            $parentMenuIdsFromSubs = array_diff($parentMenuIdsFromSubs, $rmMenus);
+            $effectiveMenuIds = array_values(array_unique(array_merge($effectiveMenuIds, $parentMenuIdsFromSubs)));
         }
 
         return [
-            'role_type'    => $role?->role_type,
-            'menu_ids'     => $effectiveMenuIds,
-            'submenu_ids'  => $effectiveSubmenuIds,
+            'role_type'   => $roleType,
+            'menu_ids'    => $effectiveMenuIds,
+            'submenu_ids' => $effectiveSubmenuIds,
         ];
     }
 
@@ -115,21 +142,28 @@ class HandleInertiaRequests extends Middleware
 
         ['role_type' => $roleType, 'menu_ids' => $menuIds, 'submenu_ids' => $submenuIds] = $this->resolveNavAccess($user);
 
-        return NavParentMenu::with(['menus' => function ($q) use ($menuIds, $submenuIds) {
+        if (! $roleType || empty($menuIds)) {
+            return [];
+        }
+
+        return NavParentMenu::with(['menus' => function ($q) use ($menuIds, $submenuIds, $roleType) {
             $q->where('is_active', true)
-              ->when($menuIds !== null, fn ($q2) => $q2->whereIn('id', $menuIds ?: [0]))
+              ->where('type', $roleType)
+              ->whereIn('id', $menuIds)
               ->with(['submenus' => function ($q2) use ($submenuIds) {
                   $q2->where('is_active', true)
-                     ->when($submenuIds !== null, fn ($q3) => $q3->whereIn('id', $submenuIds ?: [0]))
+                     ->whereIn('id', $submenuIds ?: [0])
                      ->orderBy('sort_order');
               }])
               ->orderBy('sort_order');
         }])
             ->where('is_active', true)
-            ->when($roleType, fn ($q) => $q->where('type', $roleType))
+            ->where('type', $roleType)
             ->orderBy('sort_order')
             ->orderBy('id')
-            ->get();
+            ->get()
+            ->filter(fn ($parent) => $parent->menus->isNotEmpty())
+            ->values();
     }
 
     private function buildNavMenus($user)
@@ -140,15 +174,19 @@ class HandleInertiaRequests extends Middleware
 
         ['role_type' => $roleType, 'menu_ids' => $menuIds, 'submenu_ids' => $submenuIds] = $this->resolveNavAccess($user);
 
+        if (! $roleType || empty($menuIds)) {
+            return [];
+        }
+
         return NavMenu::with(['submenus' => function ($q) use ($submenuIds) {
             $q->where('is_active', true)
-              ->when($submenuIds !== null, fn ($q2) => $q2->whereIn('id', $submenuIds ?: [0]))
+              ->whereIn('id', $submenuIds ?: [0])
               ->orderBy('sort_order');
         }])
             ->where('is_active', true)
             ->whereNull('parent_menu_id')
-            ->when($menuIds !== null, fn ($q) => $q->whereIn('id', $menuIds ?: [0]))
-            ->when($roleType, fn ($q) => $q->where('type', $roleType))
+            ->whereIn('id', $menuIds)
+            ->where('type', $roleType)
             ->orderBy('sort_order')
             ->orderBy('id')
             ->get();

@@ -48,9 +48,27 @@ function isMenuExpanded(menu: NavMenu) {
   return expandedMenus.value.has(menu.id)
 }
 
+function hasRoute(to: string | null | undefined): boolean {
+  if (!to) return false
+  const trimmed = to.trim()
+  return trimmed !== '' && trimmed !== '#'
+}
+
+function getIconClass(iconKey: string | null | undefined): string {
+  if (!iconKey) return 'bi bi-circle'
+  const trimmed = iconKey.trim()
+  if (!trimmed) return 'bi bi-circle'
+  if (/\bfa(-|s\b|r\b|b\b|l\b|d\b|\b)/.test(trimmed)) {
+    return trimmed
+  }
+  const cleaned = trimmed.replace(/\bbi\b/g, '').trim()
+  if (!cleaned) return 'bi bi-circle'
+  return cleaned.startsWith('bi-') ? `bi ${cleaned}` : `bi bi-${cleaned}`
+}
+
 function isParentActive(parent: NavParentMenu) {
   return parent.menus?.some(m =>
-    (m.to && isActive(m.to)) || hasActiveSubmenu(m)
+    (hasRoute(m.to) && isActive(m.to!)) || hasActiveSubmenu(m)
   ) ?? false
 }
 </script>
@@ -93,25 +111,24 @@ function isParentActive(parent: NavParentMenu) {
         </div>
         <template v-for="menu in parent.menus" :key="menu.id">
 
-          <!-- Direct link (no submenus) -->
+          <!-- Menu with a "to/route" value -> clicking takes action -->
           <Link
-            v-if="menu.to && (!menu.submenus || menu.submenus.length === 0)"
-            :href="menu.to"
-            :class="['ni', isActive(menu.to) ? 'on' : '']"
+            v-if="hasRoute(menu.to)"
+            :href="menu.to!"
+            :class="['ni', isActive(menu.to!) ? 'on' : '']"
           >
-            <i v-if="menu.icon_key" :class="menu.icon_key" class="ni-icon"></i>
-            <svg v-else viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/></svg>
+            <i :class="[getIconClass(menu.icon_key), 'ni-icon']"></i>
             {{ menu.name }}
           </Link>
 
-          <!-- Dropdown menu with submenus -->
-          <template v-else>
+          <!-- Menu without a "to/route" value and with submenus -> clicking expands it -->
+          <template v-else-if="menu.submenus && menu.submenus.length > 0">
             <button
+              type="button"
               @click="toggleMenu(menu)"
               :class="['ni', hasActiveSubmenu(menu) ? 'on' : '']"
             >
-              <i v-if="menu.icon_key" :class="menu.icon_key" class="ni-icon"></i>
-              <svg v-else viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/></svg>
+              <i :class="[getIconClass(menu.icon_key), 'ni-icon']"></i>
               {{ menu.name }}
               <span class="ni-chevron">{{ isMenuExpanded(menu) ? '▲' : '▼' }}</span>
             </button>
@@ -121,7 +138,7 @@ function isParentActive(parent: NavParentMenu) {
                 :href="sub.to || '#'"
                 :class="['ni', 'ni-sub', sub.to && isActive(sub.to) ? 'on' : '']"
               >
-                <i v-if="sub.icon_key" :class="sub.icon_key" class="ni-icon"></i>
+                <i v-if="sub.icon_key && sub.icon_key.trim()" :class="[getIconClass(sub.icon_key), 'ni-icon']"></i>
                 <svg v-else viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/></svg>
                 {{ sub.name }}
               </Link>
