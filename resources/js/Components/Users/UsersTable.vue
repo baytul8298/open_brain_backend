@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { ref } from 'vue'
 import { router } from '@inertiajs/vue3'
 import type { User } from '@/types/models/User'
 import { format } from 'date-fns'
@@ -12,6 +11,7 @@ interface Props {
     per_page: number
     total: number
   }
+  search: string
   userType: string
   userTypeOptions: Array<{ value: string; label: string }>
   status: string
@@ -26,16 +26,19 @@ const emit = defineEmits<{
   delete: [user: User]
   'apply-filters': []
   'reset-filters': []
+  'update:search': [value: string]
   'update:userType': [value: string]
   'update:status': [value: string]
   'update:createdFromDate': [value: Date | null]
   'update:createdToDate': [value: Date | null]
 }>()
 
-const search = ref('')
-
 function handleEdit(user: User) { emit('edit', user) }
 function handleDelete(user: User) { emit('delete', user) }
+
+function isUserActive(user: User): boolean {
+  return user.status === 'active' || user.status === true || (user.status as unknown) === 1 || (user.status as unknown) === '1'
+}
 
 function formatDate(d: string | null | undefined) {
   if (!d) return '—'
@@ -57,7 +60,16 @@ function getAvatarColor(name: string | null | undefined) {
 
 function goToPage(page: number) {
   if (page < 1 || page > props.users.last_page) return
-  router.visit(`/users?page=${page}`, { preserveState: true, preserveScroll: true })
+  router.get(
+    '/users',
+    {
+      page,
+      search: props.search || undefined,
+      user_type: props.userType || undefined,
+      status: props.status !== '' ? props.status : undefined,
+    },
+    { preserveState: true, preserveScroll: true }
+  )
 }
 
 const pages = (current: number, last: number) => {
@@ -73,21 +85,22 @@ const pages = (current: number, last: number) => {
   <div class="card">
     <!-- Toolbar -->
     <div class="ch">
-      <div class="tb" style="flex:1">
+      <div class="tb" style="margin-left:auto">
         <div class="ts">
           <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-          <input v-model="search" placeholder="Name, email, username…"/>
+          <input
+            :value="search"
+            placeholder="Name, email, username…"
+            @input="$emit('update:search', ($event.target as HTMLInputElement).value)"
+          />
         </div>
-        <select class="tsel" :value="userType" @change="$emit('update:userType', ($event.target as HTMLSelectElement).value)">
-          <option value="">All Types</option>
+        <select class="tsel" :value="userType" @change="$emit('update:userType', ($event.target as HTMLSelectElement).value); $emit('apply-filters')">
           <option v-for="opt in userTypeOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
         </select>
-        <select class="tsel" :value="status" @change="$emit('update:status', ($event.target as HTMLSelectElement).value)">
-          <option value="">All Status</option>
+        <select class="tsel" :value="status" @change="$emit('update:status', ($event.target as HTMLSelectElement).value); $emit('apply-filters')">
           <option v-for="opt in statusOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
         </select>
         <button class="btn bg2 bsm" @click="$emit('reset-filters')">Reset</button>
-        <button class="btn bp bsm" @click="$emit('apply-filters')">Apply</button>
       </div>
     </div>
 
@@ -123,7 +136,7 @@ const pages = (current: number, last: number) => {
               <span v-else class="badge bg-m">No role</span>
             </td>
             <td>
-              <span :class="['badge', user.status ? 'bg-g' : 'bg-r']">{{ user.status ? 'Active' : 'Inactive' }}</span>
+              <span :class="['badge', isUserActive(user) ? 'bg-g' : 'bg-r']">{{ isUserActive(user) ? 'Active' : 'Inactive' }}</span>
             </td>
             <td style="color:#8a7f72;font-size:.74rem">{{ formatDate(user.created_at) }}</td>
             <td>
@@ -162,7 +175,7 @@ const pages = (current: number, last: number) => {
 .ch{padding:13px 17px 12px;border-bottom:1px solid #e0d8cc;display:flex;align-items:center;justify-content:space-between;gap:9px;flex-wrap:wrap}
 .cb{padding:15px 17px}
 .tb{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-.ts{display:flex;align-items:center;gap:6px;background:#f0e8d6;border:1.5px solid #e0d8cc;border-radius:9px;padding:6px 10px;flex:1;min-width:170px;transition:border-color .16s}
+.ts{display:flex;align-items:center;gap:6px;background:#f0e8d6;border:1.5px solid #e0d8cc;border-radius:9px;padding:6px 10px;width:200px;transition:border-color .16s}
 .ts:focus-within{border-color:#e8b96a}
 .ts svg{width:12px;height:12px;stroke:#8a7f72;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}
 .ts input{border:none;background:none;font-family:'DM Sans',sans-serif;font-size:.78rem;color:#0e0b07;outline:none;flex:1;min-width:0}

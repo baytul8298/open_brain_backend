@@ -3,13 +3,24 @@
 use App\Http\Controllers\Admin\ManagePermissionsController;
 use App\Http\Controllers\Admin\RoleController;
 use App\Http\Controllers\Admin\SubjectController;
+use App\Http\Controllers\Admin\TeacherController;
 use App\Http\Controllers\Admin\UserController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware(['auth', 'verified', 'role:super-admin'])->group(function () {
     // Static view pages
     Route::get('/analytics', fn() => inertia('Admin/Analytics/Index'))->name('analytics');
-    Route::get('/teachers', fn() => inertia('Admin/Teachers/Index'))->name('teachers');
+
+    // Teachers Routes
+    Route::prefix('teachers')->name('teachers.')->group(function () {
+        Route::get('/', [TeacherController::class, 'index'])->name('index');
+        Route::post('/', [TeacherController::class, 'store'])->name('store');
+        Route::put('/{id}', [TeacherController::class, 'update'])->name('update');
+        Route::post('/{id}/approve', [TeacherController::class, 'approve'])->name('approve');
+        Route::post('/{id}/reject', [TeacherController::class, 'reject'])->name('reject');
+        Route::post('/{id}/toggle-status', [TeacherController::class, 'toggleStatus'])->name('toggle-status');
+        Route::delete('/{id}', [TeacherController::class, 'destroy'])->name('destroy');
+    });
     Route::get('/courses', fn() => inertia('Admin/Courses/Index'))->name('courses');
     Route::get('/enrollments', fn() => inertia('Admin/Enrollments/Index'))->name('enrollments');
     Route::get('/assignments', fn() => inertia('Admin/Assignments/Index'))->name('assignments');

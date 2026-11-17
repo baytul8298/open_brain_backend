@@ -33,16 +33,18 @@ class UserController extends Controller
         ];
 
         $users = $this->userRepository->paginate($perPage, $search, $filters);
-        $roles = $this->roleRepository->all();
+        $roles = $this->roleRepository->all()
+            ->reject(fn ($role) => in_array(strtolower($role->name), ['teacher', 'student'], true)
+                || in_array(strtolower((string) $role->role_type), ['teacher', 'student'], true))
+            ->values();
 
-        // User type options
+        // User type options from roles table (excluding teacher and student)
         $userTypeOptions = [
             ['value' => '', 'label' => 'All User Types'],
-            ['value' => 'admin', 'label' => 'Admin'],
-            ['value' => 'manager', 'label' => 'Manager'],
-            ['value' => 'cashier', 'label' => 'Cashier'],
-            ['value' => 'waiter', 'label' => 'Waiter'],
-            ['value' => 'user', 'label' => 'User'],
+            ...$roles->map(fn ($role) => [
+                'value' => $role->name,
+                'label' => $role->display_name ?: $role->name,
+            ])->all(),
         ];
 
         // Status options
@@ -55,9 +57,7 @@ class UserController extends Controller
         // Language options
         $languageOptions = [
             ['value' => 'en', 'label' => 'English'],
-            ['value' => 'es', 'label' => 'Spanish'],
-            ['value' => 'fr', 'label' => 'French'],
-            ['value' => 'de', 'label' => 'German'],
+            ['value' => 'bn', 'label' => 'Bangla'],
         ];
 
         return Inertia::render('Admin/Users/Index', [
@@ -96,16 +96,28 @@ class UserController extends Controller
         ]);
 
         try {
+            if (!empty($validated['role_id'])) {
+                $role = $this->roleRepository->findById((int) $validated['role_id']);
+                if ($role) {
+                    $validated['user_type'] = $role->name;
+                }
+            } elseif (!empty($validated['user_type'])) {
+                $role = $this->roleRepository->all()->firstWhere('name', $validated['user_type']);
+                if ($role) {
+                    $validated['role_id'] = $role->id;
+                }
+            }
+
             $user = $this->userRepository->create($validated);
 
             // Assign role if provided
-            if (isset($validated['role_id'])) {
-                $this->userRepository->assignRole($user->id, $validated['role_id']);
+            if (!empty($validated['role_id'])) {
+                $this->userRepository->assignRole($user->id, (int) $validated['role_id']);
             }
 
             return redirect()->back()->with('success', 'User created successfully.');
         } catch (\Exception $e) {
-            dd($e->getMessage());
+            //dd($e->getMessage());
             return redirect()->back()->with('error', 'Failed to create user: ' . $e->getMessage());
         }
     }
@@ -120,7 +132,7 @@ class UserController extends Controller
             'username' => ['required', 'string', 'max:255', Rule::unique('users', 'username')->ignore($id)],
             'email' => ['required', 'string', 'email', 'max:255', Rule::unique('users', 'email')->ignore($id)],
             'password' => 'nullable|string|min:6',
-            'user_type' => 'required|string|max:255',
+            'user_type' => 'nullable|string|max:255',
             'contact_no' => 'nullable|string|max:255',
             'address' => 'nullable|string|max:500',
             'language' => 'nullable|string|max:10',
@@ -129,11 +141,23 @@ class UserController extends Controller
         ]);
 
         try {
+            if (!empty($validated['role_id'])) {
+                $role = $this->roleRepository->findById((int) $validated['role_id']);
+                if ($role) {
+                    $validated['user_type'] = $role->name;
+                }
+            } elseif (!empty($validated['user_type'])) {
+                $role = $this->roleRepository->all()->firstWhere('name', $validated['user_type']);
+                if ($role) {
+                    $validated['role_id'] = $role->id;
+                }
+            }
+
             $user = $this->userRepository->update($id, $validated);
 
             // Assign role if provided
-            if (isset($validated['role_id'])) {
-                $this->userRepository->assignRole($user->id, $validated['role_id']);
+            if (!empty($validated['role_id'])) {
+                $this->userRepository->assignRole($user->id, (int) $validated['role_id']);
             }
 
             return redirect()->back()->with('success', 'User updated successfully.');

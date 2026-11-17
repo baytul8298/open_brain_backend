@@ -1,10 +1,10 @@
 import type { Module } from './Module'
 import type { SubModule } from './SubModule'
 
-export type UserType = 'admin' | 'manager' | 'cashier' | 'waiter' | 'user'
+export type UserType = string
 
 export interface User {
-  id: number
+  id: number | string
   name: string
   username: string
   user_type: UserType
@@ -14,7 +14,7 @@ export interface User {
   contact_no: string | null
   address: string | null
   business_id: number | null
-  status: boolean
+  status: boolean | string
   created_at: string
   updated_at: string
   roles?: Role[]

@@ -2,8 +2,10 @@
 
 namespace App\Repositories\Admin;
 
+use App\Enums\UserRole;
 use App\Enums\UserStatus;
 use App\Models\Core\Profile;
+use App\Models\Role;
 use App\Models\User;
 use App\Repositories\Contracts\UserRepositoryInterface;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -23,7 +25,14 @@ class UserRepository implements UserRepositoryInterface
     public function paginate(int $perPage = 15, ?string $search = null, array $filters = []): LengthAwarePaginator
     {
         $query = User::query()
-            ->with(['roles', 'profile']);
+            ->with(['roles', 'profile'])
+            ->where(function ($q) {
+                $q->whereNull('user_type')
+                    ->orWhereNotIn('user_type', ['teacher', 'student']);
+            })
+            ->whereDoesntHave('roles', function ($q) {
+                $q->whereIn('name', ['teacher', 'student']);
+            });
 
         if ($search) {
             $query->where(function ($q) use ($search) {
@@ -36,12 +45,20 @@ class UserRepository implements UserRepositoryInterface
 
         // Apply user type filter
         if (!empty($filters['user_type'])) {
-            $query->where('user_type', $filters['user_type']);
+            $query->where(function ($q) use ($filters) {
+                $q->where('user_type', $filters['user_type'])
+                    ->orWhereHas('roles', fn ($r) => $r->where('name', $filters['user_type']));
+            });
         }
 
         // Apply status filter
         if (isset($filters['status']) && $filters['status'] !== '') {
-            $query->where('status', $filters['status']);
+            $statusValue = match ((string) $filters['status']) {
+                '1', 'active' => UserStatus::Active->value,
+                '0', 'inactive' => UserStatus::Inactive->value,
+                default => $filters['status'],
+            };
+            $query->where('status', $statusValue);
         }
 
         // Apply created from filter
@@ -96,6 +113,7 @@ class UserRepository implements UserRepositoryInterface
                 'email'         => $data['email'],
                 'password_hash' => $data['password'],
                 'salt'          => $data['salt'] ?? null,
+                'role'          => ($data['user_type'] ?? '') === 'super-admin' ? UserRole::SuperAdmin : UserRole::Admin,
                 'user_type'     => $data['user_type'] ?? null,
                 'phone'         => $data['contact_no'] ?? null,
                 'language'      => $data['language'] ?? 'en',
@@ -139,10 +157,12 @@ class UserRepository implements UserRepositoryInterface
                 unset($data['password'], $data['salt']);
             }
 
+            $resolvedType = $data['user_type'] ?? $user->user_type;
             $userUpdate = [
                 'username'  => $data['username'] ?? $user->username,
                 'email'     => $data['email'] ?? $user->email,
-                'user_type' => $data['user_type'] ?? $user->user_type,
+                'role'      => $resolvedType === 'super-admin' ? UserRole::SuperAdmin : UserRole::Admin,
+                'user_type' => $resolvedType,
                 'phone'     => $data['contact_no'] ?? $user->phone,
                 'language'  => $data['language'] ?? $user->language,
                 'status'    => isset($data['status'])
@@ -243,6 +263,10 @@ class UserRepository implements UserRepositoryInterface
 
         if ($user) {
             $user->syncRoles([$roleId]);
+            $role = Role::find($roleId);
+            if ($role) {
+                $user->update(['user_type' => $role->name]);
+            }
         }
     }
 

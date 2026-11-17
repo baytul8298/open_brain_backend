@@ -37,6 +37,7 @@ const showDeleteConfirm = ref(false)
 const userToDelete = ref<User | null>(null)
 
 // Filter states
+const searchQuery = ref(props.filters.search || '')
 const userType = ref(props.filters.user_type || '')
 const status = ref(props.filters.status || '')
 const createdFromDate = ref<Date | null>(
@@ -45,6 +46,16 @@ const createdFromDate = ref<Date | null>(
 const createdToDate = ref<Date | null>(
   props.filters.created_to ? new Date(props.filters.created_to) : null
 )
+
+let searchTimeout: ReturnType<typeof setTimeout>
+
+function onSearchUpdate(value: string) {
+  searchQuery.value = value
+  clearTimeout(searchTimeout)
+  searchTimeout = setTimeout(() => {
+    applyFilters()
+  }, 300)
+}
 
 function openCreateModal() {
   modalMode.value = 'create'
@@ -86,11 +97,13 @@ function cancelDelete() {
 }
 
 function applyFilters() {
+  clearTimeout(searchTimeout)
   router.get(
     '/users',
     {
+      search: searchQuery.value || undefined,
       user_type: userType.value || undefined,
-      status: status.value || undefined,
+      status: status.value !== '' ? status.value : undefined,
       created_from: createdFromDate.value
         ? createdFromDate.value.toISOString().split('T')[0]
         : undefined,
@@ -106,6 +119,8 @@ function applyFilters() {
 }
 
 function resetFilters() {
+  clearTimeout(searchTimeout)
+  searchQuery.value = ''
   userType.value = ''
   status.value = ''
   createdFromDate.value = null
@@ -158,6 +173,7 @@ function resetFilters() {
       <!-- Users Table Card -->
       <UsersTable
         :users="users"
+        :search="searchQuery"
         :user-type="userType"
         :user-type-options="userTypeOptions"
         :status="status"
@@ -168,6 +184,7 @@ function resetFilters() {
         @delete="handleDeleteClick"
         @apply-filters="applyFilters"
         @reset-filters="resetFilters"
+        @update:search="onSearchUpdate"
         @update:user-type="userType = $event"
         @update:status="status = $event"
         @update:created-from-date="createdFromDate = $event"

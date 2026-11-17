@@ -37,18 +37,44 @@ const roleOptions = computed(() => [
   ...props.roles.map(r => ({ value: r.id.toString(), label: r.display_name || r.name })),
 ])
 
+function isActiveStatus(status: unknown): boolean {
+  return status === 'active' || status === true || status === 1 || status === '1'
+}
+
+function populateForm(user: User) {
+  const roleName = user.roles?.[0]?.name || user.user_type || ''
+  const matchedRole = props.roles.find(r => r.id === user.roles?.[0]?.id || r.name === roleName)
+  form.name = user.name ?? ''
+  form.username = user.username
+  form.email = user.email
+  form.password = ''
+  form.user_type = matchedRole?.name || roleName
+  form.contact_no = user.contact_no || ''
+  form.address = user.address || ''
+  form.language = user.language || ''
+  form.status = isActiveStatus(user.status) ? '1' : '0'
+  form.role_id = matchedRole ? String(matchedRole.id) : (user.roles?.[0]?.id ? String(user.roles[0].id) : '')
+}
+
+watch(() => form.user_type, (newType) => {
+  if (!newType) return
+  const matchedRole = props.roles.find(r => r.name === newType)
+  if (matchedRole && form.role_id !== String(matchedRole.id)) {
+    form.role_id = String(matchedRole.id)
+  }
+})
+
+watch(() => form.role_id, (newRoleId) => {
+  if (!newRoleId) return
+  const matchedRole = props.roles.find(r => String(r.id) === String(newRoleId))
+  if (matchedRole && form.user_type !== matchedRole.name) {
+    form.user_type = matchedRole.name
+  }
+})
+
 watch(() => props.user, (newUser) => {
   if (newUser && props.mode === 'edit') {
-    form.name = newUser.name ?? ''
-    form.username = newUser.username
-    form.email = newUser.email
-    form.password = ''
-    form.user_type = newUser.user_type || ''
-    form.contact_no = newUser.contact_no || ''
-    form.address = newUser.address || ''
-    form.language = newUser.language || ''
-    form.status = newUser.status ? '1' : '0'
-    form.role_id = newUser.roles?.[0]?.id ? String(newUser.roles[0].id) : ''
+    populateForm(newUser)
   } else {
     form.reset()
   }
@@ -57,16 +83,7 @@ watch(() => props.user, (newUser) => {
 watch(() => props.open, (isOpen) => {
   if (isOpen) {
     if (props.mode === 'edit' && props.user) {
-      form.name = props.user.name
-      form.username = props.user.username
-      form.email = props.user.email
-      form.password = ''
-      form.user_type = props.user.user_type || ''
-      form.contact_no = props.user.contact_no || ''
-      form.address = props.user.address || ''
-      form.language = props.user.language || ''
-      form.status = props.user.status ? '1' : '0'
-      form.role_id = props.user.roles?.[0]?.id ? String(props.user.roles[0].id) : ''
+      populateForm(props.user)
     } else {
       form.reset()
     }

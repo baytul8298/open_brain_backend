@@ -2,6 +2,8 @@
 
 namespace Database\Factories;
 
+use App\Enums\UserRole;
+use App\Enums\UserStatus;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
@@ -24,11 +26,18 @@ class UserFactory extends Factory
     public function definition(): array
     {
         return [
-            'name' => fake()->name(),
-            'email' => fake()->unique()->safeEmail(),
+            'email'             => fake()->unique()->safeEmail(),
+            'phone'             => fake()->unique()->numerify('+88017########'),
+            'username'          => fake()->unique()->userName(),
+            'password_hash'     => static::$password ??= Hash::make('password'),
+            'role'              => UserRole::Student,
+            'status'            => UserStatus::Active,
+            'user_type'         => 'student',
+            'language'          => 'en',
+            'email_verified'    => true,
+            'phone_verified'    => true,
             'email_verified_at' => now(),
-            'password' => static::$password ??= Hash::make('password'),
-            'remember_token' => Str::random(10),
+            'remember_token'    => Str::random(10),
         ];
     }
 
@@ -38,6 +47,7 @@ class UserFactory extends Factory
     public function unverified(): static
     {
         return $this->state(fn (array $attributes) => [
+            'email_verified'    => false,
             'email_verified_at' => null,
         ]);
     }

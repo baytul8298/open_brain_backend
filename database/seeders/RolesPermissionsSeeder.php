@@ -7,7 +7,6 @@ use App\Models\Permission;
 use App\Models\Role;
 use App\Models\SubModule;
 use Illuminate\Database\Seeder;
-use Illuminate\Support\Facades\DB;
 
 class RolesPermissionsSeeder extends Seeder
 {
@@ -18,16 +17,7 @@ class RolesPermissionsSeeder extends Seeder
             ->store(config('permission.cache.store') != 'default' ? config('permission.cache.store') : null)
             ->forget(config('permission.cache.key'));
 
-        // Clear existing data (pivot first, then permissions/roles/modules)
-        DB::table('role_has_permissions')->delete();
-        DB::table('model_has_permissions')->delete();
-        DB::table('model_has_roles')->delete();
-        Permission::query()->delete();
-        Role::query()->delete();
-        SubModule::query()->delete();
-        Module::query()->delete();
-
-        // ── MODULES & PERMISSIONS ──────────────────────────────────────────
+        // ── MODULES, SUB-MODULES & PERMISSIONS ─────────────────────────────
         $structure = [
             'Academics' => [
                 'Section'               => ['Add', 'Edit', 'List'],
@@ -37,7 +27,8 @@ class RolesPermissionsSeeder extends Seeder
                 'Academic Year'         => ['Add', 'Edit', 'List'],
             ],
             'Dashboard' => [
-                'Overview' => ['Number Of Student', 'Number Of Teacher', 'Number Of Course'],
+                'Overview'       => ['Number Of Student', 'Number Of Teacher', 'Number Of Course'],
+                'Test Dashboard' => ['View', 'Hello', 'Hello Two'],
             ],
             'Role & Permission' => [
                 'Role'  => ['Add', 'Edit', 'Assign Permission', 'Assign WB Permission'],
@@ -57,9 +48,9 @@ class RolesPermissionsSeeder extends Seeder
                 'Enrollments'       => ['View', 'List', 'Export'],
             ],
             'Users Management' => [
-                'Students'  => ['Add', 'Edit', 'List', 'Delete', 'View'],
-                'Teachers'  => ['Add', 'Edit', 'List', 'Delete', 'View'],
-                'Admins'    => ['Add', 'Edit', 'List', 'Delete'],
+                'Students' => ['Add', 'Edit', 'List', 'Delete', 'View'],
+                'Teachers' => ['Add', 'Edit', 'List', 'Delete', 'View'],
+                'Admins'   => ['Add', 'Edit', 'List', 'Delete'],
             ],
             'Reports' => [
                 'Analytics'      => ['View', 'Export'],
@@ -71,55 +62,109 @@ class RolesPermissionsSeeder extends Seeder
         $allPermissions = [];
 
         foreach ($structure as $moduleName => $subModules) {
-            $module = Module::create(['module_name' => $moduleName]);
+            $module = Module::updateOrCreate(
+                ['module_name' => $moduleName],
+                ['module_name' => $moduleName]
+            );
 
             foreach ($subModules as $subName => $actions) {
-                $subModule = SubModule::create([
-                    'module_id' => $module->id,
-                    'name'      => $subName,
-                ]);
+                $subModule = SubModule::updateOrCreate(
+                    [
+                        'module_id' => $module->id,
+                        'name'      => $subName,
+                    ],
+                    [
+                        'module_id' => $module->id,
+                        'name'      => $subName,
+                    ]
+                );
 
                 foreach ($actions as $action) {
-                    // Slug: "academics.section.add"
                     $base = strtolower($moduleName . ' ' . $subName . ' ' . $action);
                     $slug = trim(preg_replace('/[^a-z0-9]+/', '-', $base), '-');
 
-                    $perm = Permission::create([
-                        'name'          => $slug,
-                        'display_name'  => $action,
-                        'description'   => $action . ' in ' . $subName,
-                        'guard_name'    => 'web',
-                        'module_id'     => $module->id,
-                        'sub_module'    => $subName,
-                        'sub_module_id' => $subModule->id,
-                    ]);
+                    $perm = Permission::updateOrCreate(
+                        [
+                            'name'       => $slug,
+                            'guard_name' => 'web',
+                        ],
+                        [
+                            'display_name'  => $action,
+                            'description'   => $action . ' in ' . $subName,
+                            'module_id'     => $module->id,
+                            'sub_module'    => $subName,
+                            'sub_module_id' => $subModule->id,
+                        ]
+                    );
 
                     $allPermissions[$moduleName][$subName][] = $perm;
                 }
             }
         }
 
-        // ── ROLES ──────────────────────────────────────────────────────────
+        // ── ROLES (Matches RoleController validation: role_type in admin|teacher|student) ──
         $roles = [
-            ['name' => 'student',      'display_name' => 'Student',      'role_type' => 'User Defined'],
-            ['name' => 'wb-teacher',   'display_name' => 'WB-Teacher',   'role_type' => 'User Defined'],
-            ['name' => 'wb-admin',     'display_name' => 'WB-Admin',     'role_type' => 'User Defined'],
-            ['name' => 'school-admin', 'display_name' => 'School Admin', 'role_type' => 'User Defined'],
+            [
+                'name'         => 'super-admin',
+                'display_name' => 'Super Admin',
+                'guard_name'   => 'web',
+                'role_type'    => 'admin',
+                'description'  => 'Super Administrator with full system access',
+            ],
+            [
+                'name'         => 'wb-admin',
+                'display_name' => 'WB-Admin',
+                'guard_name'   => 'web',
+                'role_type'    => 'admin',
+                'description'  => 'OpenBrain Administrator',
+            ],
+            [
+                'name'         => 'school-admin',
+                'display_name' => 'School Admin',
+                'guard_name'   => 'web',
+                'role_type'    => 'admin',
+                'description'  => 'School Administrator',
+            ],
+            [
+                'name'         => 'wb-teacher',
+                'display_name' => 'WB-Teacher',
+                'guard_name'   => 'web',
+                'role_type'    => 'teacher',
+                'description'  => 'OpenBrain Teacher',
+            ],
+            [
+                'name'         => 'student',
+                'display_name' => 'Student',
+                'guard_name'   => 'web',
+                'role_type'    => 'student',
+                'description'  => 'Student Role',
+            ],
         ];
 
         foreach ($roles as $r) {
-            Role::create([
-                'name'         => $r['name'],
-                'display_name' => $r['display_name'],
-                'guard_name'   => 'web',
-                'role_type'    => $r['role_type'],
-            ]);
+            Role::updateOrCreate(
+                [
+                    'name'       => $r['name'],
+                    'guard_name' => $r['guard_name'],
+                ],
+                [
+                    'display_name' => $r['display_name'],
+                    'role_type'    => $r['role_type'],
+                    'description'  => $r['description'],
+                ]
+            );
         }
 
-        // ── ASSIGN SAMPLE PERMISSIONS TO STUDENT ROLE ─────────────────────
+        // ── ASSIGN PERMISSIONS TO ROLES ────────────────────────────────────
+        // 1. Super Admin -> all permissions
+        $superAdmin = Role::where('name', 'super-admin')->first();
+        if ($superAdmin) {
+            $superAdmin->syncPermissions(Permission::pluck('id')->toArray());
+        }
+
+        // 2. Student -> Academics, Dashboard, My Calendar
         $student = Role::where('name', 'student')->first();
         if ($student) {
-            // Give student: Academics fully + Dashboard view + Calendar view
             $studentPerms = [];
             foreach (['Academics', 'Dashboard', 'My Calendar'] as $mod) {
                 if (isset($allPermissions[$mod])) {
@@ -133,15 +178,41 @@ class RolesPermissionsSeeder extends Seeder
             $student->syncPermissions($studentPerms);
         }
 
-        // Give school-admin most permissions
+        // 3. WB-Teacher -> Academics, Dashboard, Courses, Reports
+        $teacher = Role::where('name', 'wb-teacher')->first();
+        if ($teacher) {
+            $teacherPerms = Permission::whereIn(
+                'module_id',
+                Module::whereIn('module_name', ['Academics', 'Dashboard', 'Courses', 'Reports'])->pluck('id')
+            )->pluck('id')->toArray();
+            $teacher->syncPermissions($teacherPerms);
+        }
+
+        // 4. School Admin -> School, Users Management, Courses, Reports
         $schoolAdmin = Role::where('name', 'school-admin')->first();
         if ($schoolAdmin) {
-            $adminPerms = Permission::whereIn('module_id',
+            $adminPerms = Permission::whereIn(
+                'module_id',
                 Module::whereIn('module_name', ['School', 'Users Management', 'Courses', 'Reports'])->pluck('id')
             )->pluck('id')->toArray();
             $schoolAdmin->syncPermissions($adminPerms);
         }
 
-        $this->command->info('Seeded ' . Role::count() . ' roles, ' . Permission::count() . ' permissions, ' . Module::count() . ' modules, ' . SubModule::count() . ' sub-modules.');
+        // 5. WB-Admin -> All modules except Role & Permission
+        $wbAdmin = Role::where('name', 'wb-admin')->first();
+        if ($wbAdmin) {
+            $wbAdminPerms = Permission::whereIn(
+                'module_id',
+                Module::whereIn('module_name', ['Academics', 'Dashboard', 'School', 'My Calendar', 'Courses', 'Users Management', 'Reports'])->pluck('id')
+            )->pluck('id')->toArray();
+            $wbAdmin->syncPermissions($wbAdminPerms);
+        }
+
+        $this->command?->info(
+            'Seeded ' . Role::count() . ' roles, ' .
+            Permission::count() . ' permissions, ' .
+            Module::count() . ' modules, ' .
+            SubModule::count() . ' sub-modules.'
+        );
     }
 }
